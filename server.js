@@ -8,50 +8,43 @@ app.use(cors());
 app.use(express.json());
 
 const carsFile = './data/cars.json';
+let cars = [];
 
-// GET: Devolver todos los carros
+// Cargar autos una vez al iniciar
+try {
+  const fileData = fs.readFileSync(carsFile, 'utf8');
+  cars = JSON.parse(fileData);
+  console.log(`✅ ${cars.length} autos cargados desde cars.json`);
+} catch (err) {
+  console.warn('⚠️ No se pudo cargar cars.json. Iniciando con lista vacía.');
+  cars = [];
+}
+
+// GET: Enviar todos los autos
 app.get('/api/cars', (req, res) => {
-  fs.readFile(carsFile, 'utf8', (err, data) => {
-    if (err) {
-      console.error('Error al leer cars.json:', err);
-      return res.status(500).json({ error: 'No se pudieron cargar los carros' });
-    }
-
-    try {
-      const cars = JSON.parse(data);
-      res.json(cars);
-    } catch (parseError) {
-      console.error('Error al parsear cars.json:', parseError);
-      res.status(500).json({ error: 'Error al procesar los datos' });
-    }
-  });
+  res.json(cars);
 });
 
-// POST: Agregar nuevo carro
+// POST: Agregar un auto
 app.post('/api/cars', (req, res) => {
   const newCar = req.body;
 
-  fs.readFile(carsFile, 'utf8', (err, data) => {
-    let cars = [];
-    if (!err && data) {
-      try {
-        cars = JSON.parse(data);
-      } catch (e) {
-        console.warn('No se pudo parsear JSON previo, iniciando nuevo array');
-      }
+  if (!newCar || !newCar.id) {
+    return res.status(400).json({ error: 'Faltan datos del vehículo' });
+  }
+
+  cars.push(newCar);
+
+  // Guardar también en el archivo (aunque Render no lo mantendrá)
+  fs.writeFile(carsFile, JSON.stringify(cars, null, 2), (err) => {
+    if (err) {
+      console.error('❌ Error al guardar en cars.json:', err);
+    } else {
+      console.log('✅ Auto guardado en cars.json');
     }
-
-    cars.push(newCar);
-
-    fs.writeFile(carsFile, JSON.stringify(cars, null, 2), (err) => {
-      if (err) {
-        console.error('Error al guardar:', err);
-        return res.status(500).json({ error: 'Error al guardar' });
-      }
-
-      res.status(201).json(newCar);
-    });
   });
+
+  res.status(201).json(newCar);
 });
 
 app.listen(PORT, () => {
