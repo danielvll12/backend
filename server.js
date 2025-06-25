@@ -48,6 +48,11 @@ app.post('/api/cars', (req, res) => {
   res.status(201).json(newCar);
 });
 
+app.get('/', (req, res) => {
+  res.send('🚗 Backend funcionando correctamente');
+});
+
+
 app.listen(PORT, () => {
   console.log(`🚀 Servidor escuchando en http://localhost:${PORT}`);
 });
