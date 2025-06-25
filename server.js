@@ -5,54 +5,41 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
-app.use(express.json({ limit: '5mb' }));
-
+app.use(express.json({ limit: '5mb' })); // <- mayor límite
 
 const carsFile = './data/cars.json';
-let cars = [];
 
-// Cargar autos una vez al iniciar
-try {
-  const fileData = fs.readFileSync(carsFile, 'utf8');
-  cars = JSON.parse(fileData);
-  console.log(`✅ ${cars.length} autos cargados desde cars.json`);
-} catch (err) {
-  console.warn('⚠️ No se pudo cargar cars.json. Iniciando con lista vacía.');
-  cars = [];
-}
+// Crear carpeta y archivo si no existen
+if (!fs.existsSync('./data')) fs.mkdirSync('./data');
+if (!fs.existsSync(carsFile)) fs.writeFileSync(carsFile, '[]');
 
-// GET: Enviar todos los autos
+// GET todos los carros
 app.get('/api/cars', (req, res) => {
-  res.json(cars);
-});
-
-// POST: Agregar un auto
-app.post('/api/cars', (req, res) => {
-  const newCar = req.body;
-
-  if (!newCar || !newCar.id) {
-    return res.status(400).json({ error: 'Faltan datos del vehículo' });
-  }
-
-  cars.push(newCar);
-
-  // Guardar también en el archivo (aunque Render no lo mantendrá)
-  fs.writeFile(carsFile, JSON.stringify(cars, null, 2), (err) => {
-    if (err) {
-      console.error('❌ Error al guardar en cars.json:', err);
-    } else {
-      console.log('✅ Auto guardado en cars.json');
+  fs.readFile(carsFile, 'utf8', (err, data) => {
+    if (err) return res.status(500).json({ error: 'Error leyendo datos' });
+    try {
+      const cars = JSON.parse(data);
+      res.json(cars);
+    } catch {
+      res.status(500).json({ error: 'JSON inválido' });
     }
   });
-
-  res.status(201).json(newCar);
 });
 
-app.get('/', (req, res) => {
-  res.send('🚗 Backend funcionando correctamente');
+// POST nuevo carro
+app.post('/api/cars', (req, res) => {
+  const newCar = req.body;
+  fs.readFile(carsFile, 'utf8', (err, data) => {
+    let cars = [];
+    if (!err && data) {
+      try { cars = JSON.parse(data); } catch {}
+    }
+    cars.push(newCar);
+    fs.writeFile(carsFile, JSON.stringify(cars, null, 2), (err) => {
+      if (err) return res.status(500).json({ error: 'Error al guardar' });
+      res.status(201).json(newCar);
+    });
+  });
 });
 
-
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor escuchando en http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Backend en http://localhost:${PORT}`));
