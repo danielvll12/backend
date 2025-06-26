@@ -9,6 +9,8 @@ function authenticateToken(req, res, next) {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Token inválido' });
+
+    console.log('Usuario autenticado desde token JWT:', user); // Log para depuración
     req.user = user;
     next();
   });
