@@ -13,7 +13,10 @@ const carSchema = new mongoose.Schema({
   location: String,
   imageUrl: String,
   description: String,
-  features: String,
+  features: {
+    type: [String],  // <-- Cambié esto a array de strings
+    default: []
+  },
   startDate: String,
   endDate: String
 }, { timestamps: true });
