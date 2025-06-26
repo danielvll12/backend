@@ -84,6 +84,41 @@ app.post('/api/cars', async (req, res) => {
   }
 });
 
+// DELETE: eliminar vehículo por id
+app.delete('/api/cars/:id', async (req, res) => {
+  try {
+    const carId = req.params.id;
+
+    // Eliminar de MongoDB
+    const deletedCar = await Car.findOneAndDelete({ id: carId });
+
+    if (!deletedCar) {
+      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    }
+
+    // También eliminar del archivo local (respaldo)
+    fs.readFile(carsFile, 'utf8', (err, data) => {
+      if (!err && data) {
+        let cars = [];
+        try {
+          cars = JSON.parse(data);
+          cars = cars.filter(car => car.id !== carId);
+          fs.writeFile(carsFile, JSON.stringify(cars, null, 2), (err) => {
+            if (err) console.error('❌ Error actualizando archivo local tras eliminar:', err);
+          });
+        } catch (e) {
+          console.warn('⚠️ Error parseando archivo JSON al eliminar vehículo');
+        }
+      }
+    });
+
+    res.json({ message: 'Vehículo eliminado correctamente' });
+  } catch (err) {
+    console.error('❌ Error al eliminar vehículo:', err);
+    res.status(500).json({ error: 'Error al eliminar vehículo' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Backend en http://localhost:${PORT}`);
 });
