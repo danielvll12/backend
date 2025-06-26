@@ -3,6 +3,8 @@ const cors = require('cors');
 const fs = require('fs');
 const mongoose = require('mongoose');
 const Car = require('./models/Car');
+const authRoutes = require('./routes/auth');
+const { authenticateToken, authorizeRole } = require('./middlewares/auth');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -19,12 +21,15 @@ mongoose.connect(
   console.error('❌ Error conectando a MongoDB:', err);
 });
 
-// Backup (opcional pero no prioritario)
+// Backup (opcional)
 const carsFile = './data/cars.json';
 if (!fs.existsSync('./data')) fs.mkdirSync('./data');
 if (!fs.existsSync(carsFile)) fs.writeFileSync(carsFile, '[]');
 
-// GET: obtener vehículos desde MongoDB
+// Rutas de autenticación
+app.use('/api/auth', authRoutes);
+
+// GET: obtener vehículos
 app.get('/api/cars', async (req, res) => {
   try {
     const cars = await Car.find();
@@ -61,8 +66,8 @@ app.post('/api/cars', async (req, res) => {
   }
 });
 
-// DELETE: eliminar vehículo por ID
-app.delete('/api/cars/:id', async (req, res) => {
+// DELETE: eliminar vehículo por ID (protección con token y rol admin)
+app.delete('/api/cars/:id', authenticateToken, authorizeRole('admin'), async (req, res) => {
   try {
     const carId = req.params.id;
 
@@ -71,7 +76,7 @@ app.delete('/api/cars/:id', async (req, res) => {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
 
-    // También actualizar el archivo de respaldo
+    // Actualizar respaldo local
     const data = fs.readFileSync(carsFile, 'utf8') || '[]';
     const cars = JSON.parse(data).filter(car => car.id !== carId);
     fs.writeFileSync(carsFile, JSON.stringify(cars, null, 2));
