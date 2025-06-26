@@ -3,8 +3,17 @@ const cors = require('cors');
 const fs = require('fs');
 const mongoose = require('mongoose');
 const Car = require('./models/Car');
-const authRoutes = require('./routes/auth');
-const { authenticateToken, authorizeRole } = require('./middlewares/auth');
+
+// Middleware para validar rol admin
+function checkAdminRole(req, res, next) {
+  const userRole = req.headers['x-user-role'];
+
+  if (userRole === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ error: 'Acceso denegado. Solo administradores.' });
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -21,15 +30,16 @@ mongoose.connect(
   console.error('❌ Error conectando a MongoDB:', err);
 });
 
-// Backup (opcional)
+// Backup (opcional pero no prioritario)
 const carsFile = './data/cars.json';
 if (!fs.existsSync('./data')) fs.mkdirSync('./data');
 if (!fs.existsSync(carsFile)) fs.writeFileSync(carsFile, '[]');
 
-// Rutas de autenticación
+// Importar rutas de autenticación (si las tienes)
+const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
-// GET: obtener vehículos
+// GET: obtener vehículos desde MongoDB
 app.get('/api/cars', async (req, res) => {
   try {
     const cars = await Car.find();
@@ -66,8 +76,8 @@ app.post('/api/cars', async (req, res) => {
   }
 });
 
-// DELETE: eliminar vehículo por ID (protección con token y rol admin)
-app.delete('/api/cars/:id', authenticateToken, authorizeRole('admin'), async (req, res) => {
+// DELETE: eliminar vehículo por ID (protegida con middleware admin)
+app.delete('/api/cars/:id', checkAdminRole, async (req, res) => {
   try {
     const carId = req.params.id;
 
@@ -76,7 +86,7 @@ app.delete('/api/cars/:id', authenticateToken, authorizeRole('admin'), async (re
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
 
-    // Actualizar respaldo local
+    // También actualizar el archivo de respaldo
     const data = fs.readFileSync(carsFile, 'utf8') || '[]';
     const cars = JSON.parse(data).filter(car => car.id !== carId);
     fs.writeFileSync(carsFile, JSON.stringify(cars, null, 2));
