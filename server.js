@@ -35,33 +35,47 @@ app.get('/api/cars', async (req, res) => {
   }
 });
 
-// POST: guardar en archivo y también en MongoDB
+// POST: guardar en archivo y luego en MongoDB si no existe duplicado
 app.post('/api/cars', (req, res) => {
   const newCar = req.body;
 
+  // Guardar en archivo local como respaldo
   fs.readFile(carsFile, 'utf8', (err, data) => {
     let cars = [];
     if (!err && data) {
       try {
         cars = JSON.parse(data);
-      } catch (e) {
-        console.warn('Error parseando archivo local, iniciando nuevo arreglo');
-      }
+      } catch (e) {}
     }
 
     cars.push(newCar);
-    fs.writeFile(carsFile, JSON.stringify(cars, null, 2), async (err) => {
+    fs.writeFile(carsFile, JSON.stringify(cars, null, 2), (err) => {
       if (err) return res.status(500).json({ error: 'Error al guardar en archivo' });
 
-      try {
-        const mongoCar = new Car(newCar);
-        await mongoCar.save();
-        console.log('✅ Vehículo guardado en MongoDB');
-        res.status(201).json(newCar);
-      } catch (mongoErr) {
-        console.error('❌ Error guardando en MongoDB:', mongoErr);
-        res.status(500).json({ error: 'Error guardando en MongoDB' });
-      }
+      // Verificar si ya existe en MongoDB por ID
+      Car.findOne({ id: newCar.id })
+        .then((existingCar) => {
+          if (existingCar) {
+            console.warn('⚠️ Vehículo duplicado por ID:', newCar.id);
+            return res.status(409).json({ error: 'Ya existe un vehículo con este ID' });
+          }
+
+          // Guardar en MongoDB si no existe
+          const mongoCar = new Car(newCar);
+          mongoCar.save()
+            .then(() => {
+              console.log('✅ Vehículo guardado en MongoDB');
+              res.status(201).json(newCar);
+            })
+            .catch((err) => {
+              console.error('❌ Error guardando en MongoDB:', err);
+              res.status(500).json({ error: 'Error al guardar en MongoDB' });
+            });
+        })
+        .catch((err) => {
+          console.error('❌ Error verificando duplicado:', err);
+          res.status(500).json({ error: 'Error interno del servidor' });
+        });
     });
   });
 });

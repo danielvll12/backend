@@ -1,22 +1,21 @@
-// models/Car.js
 const mongoose = require('mongoose');
 
 const carSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  ownerId: { type: String, required: true },
-  brand: { type: String, required: true },
-  model: { type: String, required: true },
-  year: { type: Number, required: true },
-  pricePerDay: { type: Number, required: true },
-  location: { type: String, required: true },
-  imageUrl: { type: String, required: true }, // base64 o url
-  description: { type: String, required: true },
-  features: [{ type: String, required: true }],
-  availability: {
-    startDate: { type: String, required: true },
-    endDate: { type: String, required: true }
+  id: {
+    type: String,
+    required: true,
+    unique: true // Para evitar duplicados
   },
-  phoneNumber: { type: String, required: true }
+  brand: String,
+  model: String,
+  year: String,
+  pricePerDay: String,
+  location: String,
+  imageUrl: String,
+  description: String,
+  features: String,
+  startDate: String,
+  endDate: String
 }, { timestamps: true });
 
 module.exports = mongoose.model('Car', carSchema);
