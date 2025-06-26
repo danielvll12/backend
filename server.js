@@ -2,15 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const mongoose = require('mongoose');
-const Car = require('./models/Car'); // <- modelo MongoDB
+const Car = require('./models/Car');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
-app.use(express.json({ limit: '5mb' })); // para imágenes base64
+app.use(express.json({ limit: '5mb' }));
 
-// Conexión a MongoDB Atlas
+// Conexión a MongoDB
 mongoose.connect(
   'mongodb+srv://danielvallec98:Liam0408%40@clusterdv.suqozna.mongodb.net/vehiculos?retryWrites=true&w=majority'
 ).then(() => {
@@ -19,15 +19,15 @@ mongoose.connect(
   console.error('❌ Error conectando a MongoDB:', err);
 });
 
-// Archivo local como respaldo
+// Backup (opcional pero no prioritario)
 const carsFile = './data/cars.json';
 if (!fs.existsSync('./data')) fs.mkdirSync('./data');
 if (!fs.existsSync(carsFile)) fs.writeFileSync(carsFile, '[]');
 
-// GET: leer desde MongoDB
+// GET: obtener vehículos desde MongoDB
 app.get('/api/cars', async (req, res) => {
   try {
-    const cars = await Car.find(); // <- desde MongoDB
+    const cars = await Car.find();
     res.json(cars);
   } catch (error) {
     console.error('❌ Error leyendo desde MongoDB:', error);
@@ -35,86 +35,50 @@ app.get('/api/cars', async (req, res) => {
   }
 });
 
-// POST: guardar en archivo y luego en MongoDB si no existe duplicado
+// POST: guardar nuevo vehículo
 app.post('/api/cars', async (req, res) => {
   const newCar = req.body;
 
-  // Validar duplicado en MongoDB antes de guardar en archivo
   try {
-    const existingCar = await Car.findOne({ id: newCar.id });
-
-    if (existingCar) {
-      console.warn('⚠️ Vehículo duplicado por ID:', newCar.id);
-      return res.status(409).json({ error: 'Ya existe un vehículo con este ID' });
+    const exists = await Car.findOne({ id: newCar.id });
+    if (exists) {
+      return res.status(409).json({ error: 'Vehículo duplicado por ID' });
     }
 
-    // Guardar en archivo local como respaldo
-    fs.readFile(carsFile, 'utf8', (err, data) => {
-      let cars = [];
-      if (!err && data) {
-        try {
-          cars = JSON.parse(data);
-        } catch (e) {
-          console.warn('⚠️ Error al parsear archivo JSON, se usará arreglo vacío');
-        }
-      }
+    const mongoCar = new Car(newCar);
+    await mongoCar.save();
 
-      cars.push(newCar);
-      fs.writeFile(carsFile, JSON.stringify(cars, null, 2), async (err) => {
-        if (err) {
-          return res.status(500).json({ error: 'Error al guardar en archivo' });
-        }
+    // Guardar respaldo en archivo
+    const backup = JSON.parse(fs.readFileSync(carsFile, 'utf8') || '[]');
+    backup.push(newCar);
+    fs.writeFileSync(carsFile, JSON.stringify(backup, null, 2));
 
-        // Guardar en MongoDB
-        try {
-          const mongoCar = new Car(newCar);
-          await mongoCar.save();
-          console.log('✅ Vehículo guardado en MongoDB');
-          res.status(201).json(newCar);
-        } catch (err) {
-          console.error('❌ Error guardando en MongoDB:', err);
-          res.status(500).json({ error: 'Error al guardar en MongoDB' });
-        }
-      });
-    });
-
+    console.log('✅ Vehículo guardado en MongoDB');
+    res.status(201).json(newCar);
   } catch (err) {
-    console.error('❌ Error verificando duplicado:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    console.error('❌ Error guardando en MongoDB:', err);
+    res.status(500).json({ error: 'Error al guardar en MongoDB' });
   }
 });
 
-// DELETE: eliminar vehículo por id
+// DELETE: eliminar vehículo por ID
 app.delete('/api/cars/:id', async (req, res) => {
   try {
     const carId = req.params.id;
 
-    // Eliminar de MongoDB
-    const deletedCar = await Car.findOneAndDelete({ id: carId });
-
-    if (!deletedCar) {
+    const deleted = await Car.findOneAndDelete({ id: carId });
+    if (!deleted) {
       return res.status(404).json({ error: 'Vehículo no encontrado' });
     }
 
-    // También eliminar del archivo local (respaldo)
-    fs.readFile(carsFile, 'utf8', (err, data) => {
-      if (!err && data) {
-        let cars = [];
-        try {
-          cars = JSON.parse(data);
-          cars = cars.filter(car => car.id !== carId);
-          fs.writeFile(carsFile, JSON.stringify(cars, null, 2), (err) => {
-            if (err) console.error('❌ Error actualizando archivo local tras eliminar:', err);
-          });
-        } catch (e) {
-          console.warn('⚠️ Error parseando archivo JSON al eliminar vehículo');
-        }
-      }
-    });
+    // También actualizar el archivo de respaldo
+    const data = fs.readFileSync(carsFile, 'utf8') || '[]';
+    const cars = JSON.parse(data).filter(car => car.id !== carId);
+    fs.writeFileSync(carsFile, JSON.stringify(cars, null, 2));
 
     res.json({ message: 'Vehículo eliminado correctamente' });
   } catch (err) {
-    console.error('❌ Error al eliminar vehículo:', err);
+    console.error('❌ Error eliminando vehículo:', err);
     res.status(500).json({ error: 'Error al eliminar vehículo' });
   }
 });
