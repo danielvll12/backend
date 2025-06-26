@@ -14,11 +14,14 @@ const carSchema = new mongoose.Schema({
   imageUrl: String,
   description: String,
   features: {
-    type: [String],  // <-- Cambié esto a array de strings
+    type: [String],  // <-- array de strings
     default: []
   },
   startDate: String,
-  endDate: String
+  endDate: String,
+
+  phoneNumber: String,  // <-- agregado aquí
+
 }, { timestamps: true });
 
 module.exports = mongoose.model('Car', carSchema);
