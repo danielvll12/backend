@@ -9,11 +9,13 @@ app.use(cors());
 app.use(express.json());
 
 // Conexión MongoDB (usa tu URI aquí)
-const uri = "mongodb+srv://usuario:contraseña@cluster0.abcde.mongodb.net/tu_basedatos?retryWrites=true&w=majority";
-
-mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("✅ Conectado a MongoDB Atlas"))
-  .catch((err) => console.error("❌ Error conectando a MongoDB:", err));
+mongoose.connect(
+  'mongodb+srv://danielvallec98:Liam0408%40@clusterdv.suqozna.mongodb.net/vehiculos?retryWrites=true&w=majority'
+).then(() => {
+  console.log('✅ Conectado a MongoDB Atlas');
+}).catch((err) => {
+  console.error('❌ Error conectando a MongoDB:', err);
+});
 
 // GET todos los carros
 app.get('/api/cars', async (req, res) => {
