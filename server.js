@@ -36,48 +36,52 @@ app.get('/api/cars', async (req, res) => {
 });
 
 // POST: guardar en archivo y luego en MongoDB si no existe duplicado
-app.post('/api/cars', (req, res) => {
+app.post('/api/cars', async (req, res) => {
   const newCar = req.body;
 
-  // Guardar en archivo local como respaldo
-  fs.readFile(carsFile, 'utf8', (err, data) => {
-    let cars = [];
-    if (!err && data) {
-      try {
-        cars = JSON.parse(data);
-      } catch (e) {}
+  // Validar duplicado en MongoDB antes de guardar en archivo
+  try {
+    const existingCar = await Car.findOne({ id: newCar.id });
+
+    if (existingCar) {
+      console.warn('⚠️ Vehículo duplicado por ID:', newCar.id);
+      return res.status(409).json({ error: 'Ya existe un vehículo con este ID' });
     }
 
-    cars.push(newCar);
-    fs.writeFile(carsFile, JSON.stringify(cars, null, 2), (err) => {
-      if (err) return res.status(500).json({ error: 'Error al guardar en archivo' });
+    // Guardar en archivo local como respaldo
+    fs.readFile(carsFile, 'utf8', (err, data) => {
+      let cars = [];
+      if (!err && data) {
+        try {
+          cars = JSON.parse(data);
+        } catch (e) {
+          console.warn('⚠️ Error al parsear archivo JSON, se usará arreglo vacío');
+        }
+      }
 
-      // Verificar si ya existe en MongoDB por ID
-      Car.findOne({ id: newCar.id })
-        .then((existingCar) => {
-          if (existingCar) {
-            console.warn('⚠️ Vehículo duplicado por ID:', newCar.id);
-            return res.status(409).json({ error: 'Ya existe un vehículo con este ID' });
-          }
+      cars.push(newCar);
+      fs.writeFile(carsFile, JSON.stringify(cars, null, 2), async (err) => {
+        if (err) {
+          return res.status(500).json({ error: 'Error al guardar en archivo' });
+        }
 
-          // Guardar en MongoDB si no existe
+        // Guardar en MongoDB
+        try {
           const mongoCar = new Car(newCar);
-          mongoCar.save()
-            .then(() => {
-              console.log('✅ Vehículo guardado en MongoDB');
-              res.status(201).json(newCar);
-            })
-            .catch((err) => {
-              console.error('❌ Error guardando en MongoDB:', err);
-              res.status(500).json({ error: 'Error al guardar en MongoDB' });
-            });
-        })
-        .catch((err) => {
-          console.error('❌ Error verificando duplicado:', err);
-          res.status(500).json({ error: 'Error interno del servidor' });
-        });
+          await mongoCar.save();
+          console.log('✅ Vehículo guardado en MongoDB');
+          res.status(201).json(newCar);
+        } catch (err) {
+          console.error('❌ Error guardando en MongoDB:', err);
+          res.status(500).json({ error: 'Error al guardar en MongoDB' });
+        }
+      });
     });
-  });
+
+  } catch (err) {
+    console.error('❌ Error verificando duplicado:', err);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
 });
 
 app.listen(PORT, () => {
