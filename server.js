@@ -2,26 +2,18 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const Car = require('./models/Car');
-
-// Middleware para validar rol admin
-function checkAdminRole(req, res, next) {
-  const userRole = req.headers['x-user-role'];
-
-  if (userRole === 'admin') {
-    next();
-  } else {
-    res.status(403).json({ error: 'Acceso denegado. Solo administradores.' });
-  }
-}
+const { authenticateToken } = require('./middleware/auth'); // Usa tu archivo auth.js
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const JWT_SECRET = process.env.JWT_SECRET || 'tu_secreto_aqui';
 
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 
-// Conexión a MongoDB
+// Conexión a MongoDB Atlas
 mongoose.connect(
   'mongodb+srv://danielvallec98:Liam0408%40@clusterdv.suqozna.mongodb.net/vehiculos?retryWrites=true&w=majority'
 ).then(() => {
@@ -30,16 +22,16 @@ mongoose.connect(
   console.error('❌ Error conectando a MongoDB:', err);
 });
 
-// Backup (opcional pero no prioritario)
+// Backup en archivo (opcional)
 const carsFile = './data/cars.json';
 if (!fs.existsSync('./data')) fs.mkdirSync('./data');
 if (!fs.existsSync(carsFile)) fs.writeFileSync(carsFile, '[]');
 
-// Importar rutas de autenticación (si las tienes)
+// Rutas de autenticación
 const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 
-// GET: obtener vehículos desde MongoDB
+// GET: obtener vehículos
 app.get('/api/cars', async (req, res) => {
   try {
     const cars = await Car.find();
@@ -50,8 +42,8 @@ app.get('/api/cars', async (req, res) => {
   }
 });
 
-// POST: guardar nuevo vehículo
-app.post('/api/cars', async (req, res) => {
+// POST: publicar un nuevo vehículo (requiere autenticación)
+app.post('/api/cars', authenticateToken, async (req, res) => {
   const newCar = req.body;
 
   try {
@@ -60,15 +52,17 @@ app.post('/api/cars', async (req, res) => {
       return res.status(409).json({ error: 'Vehículo duplicado por ID' });
     }
 
+    newCar.ownerId = req.user.userId; // Se agrega el ownerId desde el token
+
     const mongoCar = new Car(newCar);
     await mongoCar.save();
 
-    // Guardar respaldo en archivo
+    // Respaldar en archivo
     const backup = JSON.parse(fs.readFileSync(carsFile, 'utf8') || '[]');
     backup.push(newCar);
     fs.writeFileSync(carsFile, JSON.stringify(backup, null, 2));
 
-    console.log('✅ Vehículo guardado en MongoDB');
+    console.log('✅ Vehículo guardado');
     res.status(201).json(newCar);
   } catch (err) {
     console.error('❌ Error guardando en MongoDB:', err);
@@ -76,17 +70,22 @@ app.post('/api/cars', async (req, res) => {
   }
 });
 
-// DELETE: eliminar vehículo por ID (protegida con middleware admin)
-app.delete('/api/cars/:id', checkAdminRole, async (req, res) => {
+// DELETE: eliminar vehículo (solo el dueño puede hacerlo)
+app.delete('/api/cars/:id', authenticateToken, async (req, res) => {
   try {
     const carId = req.params.id;
+    const car = await Car.findOne({ id: carId });
 
-    const deleted = await Car.findOneAndDelete({ id: carId });
-    if (!deleted) {
-      return res.status(404).json({ error: 'Vehículo no encontrado' });
+    if (!car) return res.status(404).json({ error: 'Vehículo no encontrado' });
+
+    // Solo el dueño del vehículo (ownerId) puede eliminarlo
+    if (car.ownerId !== req.user.userId) {
+      return res.status(403).json({ error: 'No tienes permiso para eliminar este vehículo' });
     }
 
-    // También actualizar el archivo de respaldo
+    await Car.findOneAndDelete({ id: carId });
+
+    // Actualizar backup
     const data = fs.readFileSync(carsFile, 'utf8') || '[]';
     const cars = JSON.parse(data).filter(car => car.id !== carId);
     fs.writeFileSync(carsFile, JSON.stringify(cars, null, 2));
