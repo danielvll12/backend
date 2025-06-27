@@ -3,7 +3,8 @@ const cors = require('cors');
 const fs = require('fs');
 const mongoose = require('mongoose');
 const Car = require('./models/Car');
-const { authenticateToken } = require('./middlewares/auth');
+const { authenticateToken, authorizeRole } = require('./middlewares/auth');
+
 
 const app = express();
 const PORT = process.env.PORT || 4000;
