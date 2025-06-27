@@ -61,7 +61,7 @@ app.post('/api/cars', authenticateToken, async (req, res) => {
   try {
     const exists = await Car.findOne({ id: newCar.id });
     if (exists) {
-      return res.status(409).json({ error: 'Vehículo duplicado por ID' });
+      return res.status(409).json({ error: '✅ Vuelve a cargar la pagina por favor, para que sea guardado correctamente' });
     }
 
     const mongoCar = new Car(newCar);
