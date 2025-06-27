@@ -8,11 +8,11 @@ const carSchema = new mongoose.Schema({
   location: String,
   imageUrl: String,
   description: String,
-  features: String,
-  ownerId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User', 
-    required: true // obligatorio para saber quién creó el vehículo
+  features: [String], // ✅ Corrección aquí: array de strings
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId, // ✅ Corrección aquí: tipo ObjectId
+    ref: 'User',
+    required: true
   }
 }, { timestamps: true });
 
