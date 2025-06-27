@@ -7,8 +7,9 @@ const carSchema = new mongoose.Schema({
     unique: true,
   },
   ownerId: {
-    type: String,
-    required: true, // Este campo ahora es obligatorio
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
   },
   brand: {
     type: String,
@@ -32,26 +33,19 @@ const carSchema = new mongoose.Schema({
   },
   imageUrl: {
     type: String,
-    required: true,
   },
   description: {
     type: String,
-    required: true,
   },
   features: {
     type: [String],
-    required: true,
   },
   startDate: {
     type: String,
-    required: true,
   },
   phoneNumber: {
     type: String,
-    required: true,
-  }
-}, {
-  timestamps: true
-});
+  },
+}, { timestamps: true });
 
 module.exports = mongoose.model('Car', carSchema);
